@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SVG Generative Art Studio</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 20px;
+            max-width: 1400px;
+            width: 100%;
+        }
+
+        .canvas-section {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        h1 {
+            grid-column: 1 / -1;
+            text-align: center;
+            font-size: 2.5em;
+            background: linear-gradient(45deg, #00d4ff, #7c3aed);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        #canvas {
+            background: #0f1419;
+            border: 2px solid #7c3aed;
+            border-radius: 10px;
+            cursor: crosshair;
+            flex: 1;
+            min-height: 500px;
+            box-shadow: 0 0 30px rgba(124, 58, 237, 0.3);
+        }
+
+        .controls {
+            background: rgba(30, 30, 46, 0.9);
+            border: 2px solid #7c3aed;
+            border-radius: 10px;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        label {
+            font-size: 0.9em;
+            color: #a0aec0;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: linear-gradient(90deg, #7c3aed, #00d4ff);
+            outline: none;
+            -webkit-appearance: none;
+        }
+
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        input[type="range"]::-moz-range-thumb {
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 0 10px rgba(0, 212, 255, 0.5);
+        }
+
+        input[type="color"] {
+            width: 100%;
+            height: 40px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #0f1419;
+            color: #00d4ff;
+            border: 1px solid #7c3aed;
+            border-radius: 5px;
+            font-size: 0.9em;
+            cursor: pointer;
+        }
+
+        .button-group {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        button {
+            padding: 12px 20px;
+            background: linear-gradient(45deg, #7c3aed, #00d4ff);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            font-size: 0.8em;
+            letter-spacing: 1px;
+        }
+
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 20px rgba(124, 58, 237, 0.6);
+        }
+
+        button.secondary {
+            background: rgba(124, 58, 237, 0.3);
+            border: 1px solid #7c3aed;
+        }
+
+        .value-display {
+            text-align: center;
+            font-size: 0.85em;
+            color: #00d4ff;
+            font-family: monospace;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+            }
+
+            #canvas {
+                min-height: 400px;
+            }
+
+            h1 {
+                font-size: 1.8em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>SVG Generative Art Studio</h1>
+    <div class="container">
+        <div class="canvas-section">
+            <svg id="canvas"></svg>
+        </div>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="mode">Pattern Type</label>
+                <select id="mode">
+                    <option value="spiral">Spiral</option>
+                    <option value="waves">Waves</option>
+                    <option value="mandala">Mandala</option>
+                    <option value="particles">Particles</option>
+                    <option value="grid">Grid Flow</option>
+                </select>
+            </div>
+
+            <div class="control-group">
+                <label for="speed">Speed</label>
+                <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+                <div class="value-display" id="speedValue">1.0x</div>
+            </div>
+
+            <div class="control-group">
+                <label for="density">Density</label>
+                <input type="range" id="density" min="5" max="200" step="5" value="50">
+                <div class="value-display" id="densityValue">50</div>
+            </div>
+
+            <div class="control-group">
+                <label for="color1">Color 1</label>
+                <input type="color" id="color1" value="#7c3aed">
+            </div>
+
+            <div class="control-group">
+                <label for="color2">Color 2</label>
+                <input type="color" id="color2" value="#00d4ff">
+            </div>
+
+            <div class="control-group">
+                <label for="color3">Color 3</label>
+                <input type="color" id="color3" value="#ec4899">
+            </div>
+
+            <div class="button-group">
+                <button onclick="toggleAnimation()">Play / Pause</button>
+                <button class="secondary" onclick="randomize()">Random</button>
+            </div>
+
+            <button class="secondary" onclick="downloadSVG()" style="width: 100%;">Download SVG</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const modeSelect = document.getElementById('mode');
+        const speedInput = document.getElementById('speed');
+        const densityInput = document.getElementById('density');
+        const color1Input = document.getElementById('color1');
+        const color2Input = document.getElementById('color2');
+        const color3Input = document.getElementById('color3');
+
+        let time = 0;
+        let isAnimating = true;
+        let animationId = null;
+
+        // Set canvas size
+        function resizeCanvas() {
+            const rect = canvas.parentElement.getBoundingClientRect();
+            canvas.setAttribute('width', rect.width);
+            canvas.setAttribute('height', rect.height);
+        }
+
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+
+        // Update value displays
+        speedInput.addEventListener('input', (e) => {
+            document.getElementById('speedValue').textContent = e.target.value + 'x';
+        });
+
+        densityInput.addEventListener('input', (e) => {
+            document.getElementById('densityValue').textContent = e.target.value;
+        });
+
+        // Pattern generators
+        function generateSpiral() {
+            const width = canvas.getAttribute('width');
+            const height = canvas.getAttribute('height');
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const density = parseInt(densityInput.value);
+
+            canvas.innerHTML = '';
+            const colors = [color1Input.value, color2Input.value, color3Input.value];
+
+            for (let i = 0; i < density; i++) {
+                const angle = (i / density) * Math.PI * 4 + time * 0.02 * parseFloat(speedInput.value);
+                const radius = 50 + (i / density) * 200 + Math.sin(time * 0.01) * 20;
+                const x = centerX + Math.cos(angle) * radius;
+                const y = centerY + Math.sin(angle) * radius;
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', 3 + Math.sin(angle + time * 0.05) * 2);
+                circle.setAttribute('fill', colors[i % colors.length]);
+                circle.setAttribute('opacity', 0.7);
+                canvas.appendChild(circle);
+            }
+        }
+
+        function generateWaves() {
+            const width = canvas.getAttribute('width');
+            const height = canvas.getAttribute('height');
+            const density = parseInt(densityInput.value);
+
+            canvas.innerHTML = '';
+            const colors = [color1Input.value, color2Input.value, color3Input.value];
+
+            for (let i = 0; i < density; i++) {
+                const y = (height / density) * i;
+                const points = [];
+
+                for (let x = 0; x <= width; x += width / 50) {
+                    const wave = Math.sin((x / width) * Math.PI * 4 + time * 0.02 * parseFloat(speedInput.value)) * 30;
+                    points.push([x, y + wave]);
+                }
+
+                const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+                polyline.setAttribute('points', points.map(p => p.join(',')).join(' '));
+                polyline.setAttribute('stroke', colors[i % colors.length]);
+                polyline.setAttribute('stroke-width', '2');
+                polyline.setAttribute('fill', 'none');
+                polyline.setAttribute('opacity', 0.6);
+                canvas.appendChild(polyline);
+            }
+        }
+
+        function generateMandala() {
+            const width = canvas.getAttribute('width');
+            const height = canvas.getAttribute('height');
+            const centerX = width / 2;
+            const centerY = height / 2;
+            const density = parseInt(densityInput.value);
+
+            canvas.innerHTML = '';
+            const colors = [color1Input.value, color2Input.value, color3Input.value];
+
+            for (let layer = 0; layer < 6; layer++) {
+                const radius = 40 + layer * 30;
+                for (let i = 0; i < density / 2; i++) {
+                    const angle = (i / (density / 2)) * Math.PI * 2 + time * 0.01 * parseFloat(speedInput.value);
+                    const x = centerX + Math.cos(angle) * radius;
+                    const y = centerY + Math.sin(angle) * radius;
+
+                    const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                    circle.setAttribute('cx', x);
+                    circle.setAttribute('cy', y);
+                    circle.setAttribute('r', 5 - layer * 0.5);
+                    circle.setAttribute('fill', colors[(layer + i) % colors.length]);
+                    circle.setAttribute('opacity', 0.8);
+                    canvas.appendChild(circle);
+                }
+            }
+        }
+
+        function generateParticles() {
+            const width = canvas.getAttribute('width');
+            const height = canvas.getAttribute('height');
+            const density = parseInt(densityInput.value);
+
+            canvas.innerHTML = '';
+            const colors = [color1Input.value, color2Input.value, color3Input.value];
+
+            for (let i = 0; i < density; i++) {
+                const x = Math.sin(i * 0.5 + time * 0.01 * parseFloat(speedInput.value)) * width * 0.4 + width / 2;
+                const y = Math.cos(i * 0.3 + time * 0.01 * parseFloat(speedInput.value)) * height * 0.4 + height / 2;
+                const size = Math.sin(time * 0.02 + i) * 2 + 3;
+
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', x);
+                circle.setAttribute('cy', y);
+                circle.setAttribute('r', size);
+                circle.setAttribute('fill', colors[i % colors.length]);
+                circle.setAttribute('opacity', 0.6);
+                canvas.appendChild(circle);
+            }
+        }
+
+        function generateGrid() {
+            const width = canvas.getAttribute('width');
+            const height = canvas.getAttribute('height');
+            const density = parseInt(densityInput.value) / 10;
+
+            canvas.innerHTML = '';
+            const colors = [color1Input.value, color2Input.value, color3Input.value];
+
+            const cellSize = width / density;
+
+            for (let row = 0; row < density; row++) {
+                for (let col = 0; col < density; col++) {
+                    const x = col * cellSize + cellSize / 2;
+                    const y = row * cellSize + cellSize / 2;
+                    const angle = Math.atan2(y - height / 2, x - width / 2) + time * 0.01 * parseFloat(speedInput.value);
+                    const length = cellSize * 0.3;
+
+                    const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                    line.setAttribute('x1', x);
+                    line.setAttribute('y1', y);
+                    line.setAttribute('x2', x + Math.cos(angle) * length);
+                    line.setAttribute('y2', y + Math.sin(angle) * length);
+                    line.setAttribute('stroke', colors[(row + col) % colors.length]);
+                    line.setAttribute('stroke-width', '2');
+                    line.setAttribute('opacity', 0.7);
+                    canvas.appendChild(line);
+                }
+            }
+        }
+
+        // Animation loop
+        function animate() {
+            if (isAnimating) {
+                time += parseFloat(speedInput.value);
+            }
+
+            const mode = modeSelect.value;
+            switch (mode) {
+                case 'spiral':
+                    generateSpiral();
+                    break;
+                case 'waves':
+                    generateWaves();
+                    break;
+                case 'mandala':
+                    generateMandala();
+                    break;
+                case 'particles':
+                    generateParticles();
+                    break;
+                case 'grid':
+                    generateGrid();
+                    break;
+            }
+
+            animationId = requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Control functions
+        function toggleAnimation() {
+            isAnimating = !isAnimating;
+        }
+
+        function randomize() {
+            const randomColor = () => '#' + Math.floor(Math.random()*16777215).toString(16);
+            const modes = ['spiral', 'waves', 'mandala', 'particles', 'grid'];
+
+            color1Input.value = randomColor();
+            color2Input.value = randomColor();
+            color3Input.value = randomColor();
+            modeSelect.value = modes[Math.floor(Math.random() * modes.length)];
+            densityInput.value = Math.floor(Math.random() * 150) + 30;
+            speedInput.value = (Math.random() * 4 + 0.5).toFixed(1);
+        }
+
+        function downloadSVG() {
+            const svgData = new XMLSerializer().serializeToString(canvas);
+            const blob = new Blob([svgData], { type: 'image/svg+xml' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `generative-art-${Date.now()}.svg`;
+            link.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Update patterns on input change
+        modeSelect.addEventListener('change', () => {
+            time = 0;
+        });
+    </script>
+</body>
+</html>

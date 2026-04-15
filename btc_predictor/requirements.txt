@@ -22,6 +22,10 @@ streamlit>=1.32
 plotly>=5.18
 sqlalchemy>=2.0
 
+# Web dashboard
+fastapi>=0.110
+uvicorn>=0.29
+
 # Utils
 python-dotenv>=1.0
 pydantic>=2.5

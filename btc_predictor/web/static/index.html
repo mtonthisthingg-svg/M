@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#0d0d0d">
+<title>BTC Predictor</title>
+<style>
+  :root {
+    --bg:       #0d0d0d;
+    --card:     #161616;
+    --border:   #252525;
+    --green:    #00e676;
+    --red:      #ff1744;
+    --amber:    #ffab00;
+    --blue:     #448aff;
+    --text:     #e8e8e8;
+    --muted:    #666;
+    --up:       #00e676;
+    --down:     #ff1744;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding-bottom: 2rem;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.2rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: rgba(13,13,13,0.96);
+    backdrop-filter: blur(12px);
+    z-index: 100;
+  }
+  .header-left h1 {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .header-left span {
+    font-size: 0.72rem;
+    color: var(--muted);
+    display: block;
+    margin-top: 1px;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+    display: inline-block;
+    margin-right: 5px;
+    transition: background 0.4s;
+  }
+  .status-dot.live { background: var(--green); box-shadow: 0 0 6px var(--green); }
+  .status-dot.error { background: var(--red); }
+
+  /* ── Price Hero ── */
+  .price-hero {
+    text-align: center;
+    padding: 1.8rem 1rem 1.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .price-label {
+    font-size: 0.7rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    margin-bottom: 0.4rem;
+  }
+  .price-value {
+    font-size: 3rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    font-variant-numeric: tabular-nums;
+    transition: color 0.3s;
+    line-height: 1;
+  }
+  .price-value.up   { color: var(--green); }
+  .price-value.down { color: var(--red); }
+  .price-change {
+    font-size: 0.95rem;
+    color: var(--muted);
+    margin-top: 0.4rem;
+    font-variant-numeric: tabular-nums;
+  }
+  .price-change.pos { color: var(--green); }
+  .price-change.neg { color: var(--red); }
+
+  /* ── Sparkline ── */
+  .sparkline-wrap {
+    padding: 0.6rem 1rem 0;
+    height: 60px;
+  }
+  canvas#spark {
+    width: 100%;
+    height: 52px;
+    display: block;
+  }
+
+  /* ── Cards grid ── */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.7rem;
+    padding: 1rem 0.8rem;
+  }
+  .grid.full { grid-template-columns: 1fr; }
+
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1rem;
+  }
+  .card-label {
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 0.35rem;
+  }
+  .card-value {
+    font-size: 1.45rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+  }
+  .card-value.green { color: var(--green); }
+  .card-value.red   { color: var(--red); }
+  .card-value.amber { color: var(--amber); }
+  .card-sub {
+    font-size: 0.72rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+  }
+
+  /* ── Market countdown ── */
+  .market-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1rem;
+    margin: 0 0.8rem;
+  }
+  .market-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.9rem;
+  }
+  .market-title {
+    font-size: 0.68rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+  }
+  .market-slug {
+    font-size: 0.72rem;
+    color: var(--blue);
+    font-family: monospace;
+  }
+  .countdown {
+    font-size: 2rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.03em;
+    text-align: center;
+    margin-bottom: 0.6rem;
+  }
+  .progress-track {
+    background: var(--border);
+    border-radius: 100px;
+    height: 5px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    border-radius: 100px;
+    background: linear-gradient(90deg, var(--blue), var(--green));
+    transition: width 0.9s ease;
+  }
+  .progress-fill.ending { background: linear-gradient(90deg, var(--amber), var(--red)); }
+
+  /* ── Signal badge ── */
+  .signal-wrap {
+    margin: 0 0.8rem 0;
+  }
+  .signal-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  .signal-badge {
+    width: 56px; height: 56px;
+    border-radius: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 900;
+    flex-shrink: 0;
+    letter-spacing: -0.02em;
+  }
+  .signal-badge.up-badge   { background: rgba(0,230,118,0.12); color: var(--green); }
+  .signal-badge.down-badge { background: rgba(255,23,68,0.12);  color: var(--red); }
+  .signal-badge.none-badge { background: rgba(102,102,102,0.1); color: var(--muted); }
+  .signal-info { flex: 1; min-width: 0; }
+  .signal-dir {
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .signal-dir.up   { color: var(--green); }
+  .signal-dir.down { color: var(--red); }
+  .signal-dir.none { color: var(--muted); }
+  .signal-meta {
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-top: 0.2rem;
+  }
+  .signal-edge {
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .signal-edge .big  { font-size: 1.1rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .signal-edge .lbl  { font-size: 0.65rem; color: var(--muted); }
+
+  /* ── Predictions table ── */
+  .section-title {
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 0.9rem 1rem 0.4rem;
+  }
+  .pred-list {
+    padding: 0 0.8rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+  .pred-row {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 0.75rem 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .pred-dir {
+    font-size: 0.75rem;
+    font-weight: 700;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    flex-shrink: 0;
+    min-width: 38px;
+    text-align: center;
+  }
+  .pred-dir.up   { background: rgba(0,230,118,0.12); color: var(--green); }
+  .pred-dir.down { background: rgba(255,23,68,0.12);  color: var(--red); }
+  .pred-body { flex: 1; min-width: 0; }
+  .pred-prob {
+    font-size: 0.85rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+  }
+  .pred-detail {
+    font-size: 0.7rem;
+    color: var(--muted);
+    margin-top: 1px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .pred-pnl {
+    font-size: 0.9rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+    min-width: 48px;
+    text-align: right;
+  }
+  .pred-pnl.pos { color: var(--green); }
+  .pred-pnl.neg { color: var(--red); }
+  .pred-pnl.pending { color: var(--muted); font-size: 0.8rem; }
+
+  /* ── Equity mini chart ── */
+  canvas#equityChart {
+    width: 100%;
+    height: 90px;
+    display: block;
+    margin-top: 0.4rem;
+  }
+
+  /* ── Kill switch banner ── */
+  .kill-banner {
+    margin: 0 0.8rem 0;
+    background: rgba(255,23,68,0.08);
+    border: 1px solid rgba(255,23,68,0.3);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    display: none;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    color: var(--red);
+  }
+  .kill-banner.visible { display: flex; }
+  .kill-icon { font-size: 1.1rem; }
+
+  /* ── Refresh hint ── */
+  .refresh-hint {
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--muted);
+    padding: 1.2rem 0 0.4rem;
+  }
+
+  /* ── Animations ── */
+  @keyframes flash {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.4; }
+  }
+  .flash { animation: flash 0.4s ease; }
+
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%       { opacity: 0.6; transform: scale(0.85); }
+  }
+  .status-dot.live { animation: pulse-dot 2s infinite; }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<header>
+  <div class="header-left">
+    <h1>BTC Predictor</h1>
+    <span><span class="status-dot" id="dot"></span><span id="status-text">connecting…</span></span>
+  </div>
+  <div style="font-size:0.72rem;color:var(--muted);text-align:right">
+    Chainlink oracle<br>
+    <span style="color:var(--blue);font-family:monospace;font-size:0.65rem">btc/usd</span>
+  </div>
+</header>
+
+<!-- Price hero -->
+<div class="price-hero">
+  <div class="price-label">Chainlink BTC/USD</div>
+  <div class="price-value" id="price">—</div>
+  <div class="price-change" id="price-change"></div>
+</div>
+
+<!-- Sparkline -->
+<div class="sparkline-wrap">
+  <canvas id="spark"></canvas>
+</div>
+
+<!-- Stats grid -->
+<div class="grid" style="margin-top:0.3rem">
+  <div class="card">
+    <div class="card-label">Equity</div>
+    <div class="card-value" id="equity">—</div>
+    <div class="card-sub">USDC</div>
+  </div>
+  <div class="card">
+    <div class="card-label">Total PnL</div>
+    <div class="card-value" id="pnl">—</div>
+    <div class="card-sub" id="pnl-sub"></div>
+  </div>
+  <div class="card">
+    <div class="card-label">Hit Rate</div>
+    <div class="card-value" id="hitrate">—</div>
+    <div class="card-sub" id="hitrate-sub"></div>
+  </div>
+  <div class="card">
+    <div class="card-label">Brier Score</div>
+    <div class="card-value" id="brier">—</div>
+    <div class="card-sub">0.25 = no skill</div>
+  </div>
+</div>
+
+<!-- Kill switch banner -->
+<div class="kill-banner" id="kill-banner">
+  <span class="kill-icon">🛑</span>
+  <span id="kill-msg">Trading halted</span>
+</div>
+
+<!-- Market window -->
+<div style="padding: 0 0 0.7rem; margin: 0 0.8rem 0.7rem; display:none" id="market-section">
+  <div class="market-card">
+    <div class="market-top">
+      <div>
+        <div class="market-title">Current Window</div>
+        <div class="market-slug" id="market-slug"></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:0.68rem;color:var(--muted)">Remaining</div>
+        <div class="countdown" id="countdown">—</div>
+      </div>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+    </div>
+    <div style="display:flex;justify-content:space-between;margin-top:0.4rem">
+      <span style="font-size:0.68rem;color:var(--muted)" id="open-price-label"></span>
+      <span style="font-size:0.68rem;color:var(--muted)" id="gap-label"></span>
+    </div>
+  </div>
+</div>
+
+<!-- Signal -->
+<div class="signal-wrap" style="margin-bottom:0.7rem">
+  <div class="signal-card" id="signal-card">
+    <div class="signal-badge none-badge" id="signal-badge">—</div>
+    <div class="signal-info">
+      <div class="signal-dir none" id="signal-dir">No signal</div>
+      <div class="signal-meta" id="signal-meta">Waiting for model prediction…</div>
+    </div>
+    <div class="signal-edge">
+      <div class="big" id="signal-edge-val">—</div>
+      <div class="lbl">edge</div>
+    </div>
+  </div>
+</div>
+
+<!-- Recent predictions -->
+<div class="section-title">Recent Predictions</div>
+<div class="pred-list" id="pred-list">
+  <div style="text-align:center;color:var(--muted);font-size:0.8rem;padding:1rem">
+    No predictions yet
+  </div>
+</div>
+
+<!-- Equity chart -->
+<div class="section-title" style="margin-top:0.5rem">Equity Curve</div>
+<div style="padding:0 0.8rem">
+  <div class="card">
+    <canvas id="equityChart"></canvas>
+    <div class="card-sub" id="equity-dates" style="margin-top:0.4rem;text-align:center"></div>
+  </div>
+</div>
+
+<div class="refresh-hint">Live via Chainlink RTDS · Updates every second</div>
+
+<script>
+// ─────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+
+function fmt(n, decimals=2) {
+  if (n == null || isNaN(n)) return '—';
+  return Number(n).toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}
+
+function fmtTime(ts_s) {
+  const d = new Date(ts_s * 1000);
+  return d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false });
+}
+
+function flashEl(el) {
+  el.classList.remove('flash');
+  void el.offsetWidth;
+  el.classList.add('flash');
+}
+
+// ─────────────────────────────────────────────
+// State
+// ─────────────────────────────────────────────
+let priceHistory = [];    // {ts, p}
+let prevPrice    = 0;
+let equityData   = [];
+
+// ─────────────────────────────────────────────
+// Sparkline
+// ─────────────────────────────────────────────
+function drawSpark(history) {
+  const canvas = $('spark');
+  if (!canvas) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.offsetWidth, h = canvas.offsetHeight;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  if (history.length < 2) return;
+
+  const prices = history.map(x => x.p);
+  const min = Math.min(...prices), max = Math.max(...prices);
+  const range = max - min || 1;
+
+  const scaleX = i => (i / (history.length - 1)) * w;
+  const scaleY = v => h - ((v - min) / range) * (h * 0.8) - h * 0.1;
+
+  // Gradient fill
+  const firstY = scaleY(prices[0]);
+  const lastY  = scaleY(prices[prices.length - 1]);
+  const isUp   = prices[prices.length - 1] >= prices[0];
+  const col    = isUp ? '#00e676' : '#ff1744';
+
+  const grad = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, isUp ? 'rgba(0,230,118,0.25)' : 'rgba(255,23,68,0.25)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(scaleX(0), scaleY(prices[0]));
+  for (let i = 1; i < prices.length; i++) {
+    ctx.lineTo(scaleX(i), scaleY(prices[i]));
+  }
+  ctx.lineTo(w, h);
+  ctx.lineTo(0, h);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Line
+  ctx.beginPath();
+  ctx.moveTo(scaleX(0), scaleY(prices[0]));
+  for (let i = 1; i < prices.length; i++) {
+    ctx.lineTo(scaleX(i), scaleY(prices[i]));
+  }
+  ctx.strokeStyle = col;
+  ctx.lineWidth   = 1.5;
+  ctx.stroke();
+
+  // Current dot
+  const lx = scaleX(prices.length - 1);
+  const ly = scaleY(prices[prices.length - 1]);
+  ctx.beginPath();
+  ctx.arc(lx, ly, 3, 0, Math.PI * 2);
+  ctx.fillStyle = col;
+  ctx.fill();
+}
+
+// ─────────────────────────────────────────────
+// Equity chart
+// ─────────────────────────────────────────────
+function drawEquity(data) {
+  const canvas = $('equityChart');
+  if (!canvas || data.length < 2) return;
+  const dpr = window.devicePixelRatio || 1;
+  const w = canvas.offsetWidth, h = canvas.offsetHeight || 90;
+  canvas.width  = w * dpr;
+  canvas.height = h * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  ctx.clearRect(0, 0, w, h);
+
+  const vals = data.map(d => d.equity);
+  const min = Math.min(...vals) * 0.998;
+  const max = Math.max(...vals) * 1.002;
+  const range = max - min || 1;
+
+  const scaleX = i => (i / (data.length - 1)) * w;
+  const scaleY = v => h - ((v - min) / range) * (h * 0.85) - h * 0.05;
+
+  const isUp  = vals[vals.length - 1] >= vals[0];
+  const col   = isUp ? '#00e676' : '#ff1744';
+  const grad  = ctx.createLinearGradient(0, 0, 0, h);
+  grad.addColorStop(0, isUp ? 'rgba(0,230,118,0.18)' : 'rgba(255,23,68,0.18)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  ctx.moveTo(scaleX(0), scaleY(vals[0]));
+  for (let i = 1; i < vals.length; i++) ctx.lineTo(scaleX(i), scaleY(vals[i]));
+  ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.closePath();
+  ctx.fillStyle = grad; ctx.fill();
+
+  ctx.beginPath();
+  ctx.moveTo(scaleX(0), scaleY(vals[0]));
+  for (let i = 1; i < vals.length; i++) ctx.lineTo(scaleX(i), scaleY(vals[i]));
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.stroke();
+
+  // Date range
+  if (data.length >= 2) {
+    const start = new Date(data[0].ts_s * 1000).toLocaleDateString();
+    const end   = new Date(data[data.length-1].ts_s * 1000).toLocaleDateString();
+    $('equity-dates').textContent = start === end ? start : `${start} – ${end}`;
+  }
+}
+
+// ─────────────────────────────────────────────
+// Live price via SSE
+// ─────────────────────────────────────────────
+(function connectSSE() {
+  const src = new EventSource('/stream/price');
+
+  src.onopen = () => {
+    $('dot').className = 'status-dot live';
+    $('status-text').textContent = 'live';
+  };
+
+  src.onerror = () => {
+    $('dot').className = 'status-dot error';
+    $('status-text').textContent = 'reconnecting…';
+    src.close();
+    setTimeout(connectSSE, 3000);
+  };
+
+  src.onmessage = e => {
+    const d = JSON.parse(e.data);
+    const price = d.price;
+    if (!price) return;
+
+    const el = $('price');
+    const change = prevPrice ? price - prevPrice : 0;
+    const isUp   = change >= 0;
+
+    el.textContent = '$' + fmt(price, 2);
+    el.className   = 'price-value ' + (prevPrice ? (isUp ? 'up' : 'down') : '');
+    flashEl(el);
+
+    const changeEl = $('price-change');
+    if (prevPrice && Math.abs(change) > 0.005) {
+      const sign = change > 0 ? '+' : '';
+      changeEl.textContent = `${sign}${fmt(change, 2)} (${sign}${fmt(change/prevPrice*100, 3)}%)`;
+      changeEl.className   = 'price-change ' + (change >= 0 ? 'pos' : 'neg');
+    }
+
+    prevPrice = price;
+
+    // Update price history
+    priceHistory.push({ ts: d.ts_ms, p: price });
+    if (priceHistory.length > 120) priceHistory.shift();
+    drawSpark(priceHistory);
+  };
+})();
+
+// ─────────────────────────────────────────────
+// Poll status + predictions every 2s
+// ─────────────────────────────────────────────
+async function pollStatus() {
+  try {
+    const [status, summary, preds, eq] = await Promise.all([
+      fetch('/api/status').then(r => r.json()),
+      fetch('/api/summary').then(r => r.json()),
+      fetch('/api/predictions?limit=8').then(r => r.json()),
+      fetch('/api/equity?limit=150').then(r => r.json()),
+    ]);
+
+    updateMarket(status);
+    updateSignal(status.latest_prediction);
+    updateStats(summary);
+    updatePredictions(preds.predictions || []);
+
+    equityData = eq.equity || [];
+    drawEquity(equityData);
+
+  } catch(err) {
+    console.warn('Poll error:', err);
+  }
+}
+
+// ─────────────────────────────────────────────
+// Market countdown
+// ─────────────────────────────────────────────
+function updateMarket(s) {
+  const sec = $('market-section');
+  sec.style.display = 'block';
+
+  const r   = s.remaining_s;
+  const pct = s.pct_done;
+  const mm  = String(Math.floor(r / 60)).padStart(2, '0');
+  const ss  = String(r % 60).padStart(2, '0');
+  $('countdown').textContent   = `${mm}:${ss}`;
+  $('market-slug').textContent = s.market_slug;
+
+  const fill = $('progress-fill');
+  fill.style.width = Math.min(100, pct * 100).toFixed(1) + '%';
+  fill.className   = 'progress-fill' + (r < 60 ? ' ending' : '');
+}
+
+// ─────────────────────────────────────────────
+// Latest signal
+// ─────────────────────────────────────────────
+function updateSignal(pred) {
+  if (!pred) return;
+
+  const dir   = (pred.direction || '').toUpperCase();
+  const p     = pred.p_model;
+  const m     = pred.market_mid;
+  const edge  = pred.edge;
+  const bet   = pred.bet_usdc;
+  const ts    = pred.ts_s;
+
+  const badgeEl = $('signal-badge');
+  const dirEl   = $('signal-dir');
+  const metaEl  = $('signal-meta');
+  const edgeEl  = $('signal-edge-val');
+
+  if (dir === 'UP') {
+    badgeEl.className   = 'signal-badge up-badge';
+    badgeEl.textContent = '↑';
+    dirEl.className     = 'signal-dir up';
+    dirEl.textContent   = 'UP';
+  } else if (dir === 'DOWN') {
+    badgeEl.className   = 'signal-badge down-badge';
+    badgeEl.textContent = '↓';
+    dirEl.className     = 'signal-dir down';
+    dirEl.textContent   = 'DOWN';
+  } else {
+    badgeEl.className   = 'signal-badge none-badge';
+    badgeEl.textContent = '—';
+    dirEl.className     = 'signal-dir none';
+    dirEl.textContent   = 'No signal';
+  }
+
+  metaEl.textContent = p != null
+    ? `p=${fmt(p,3)}  m=${fmt(m,3)}  $${fmt(bet,1)} bet  ${fmtTime(ts)}`
+    : 'Waiting for model prediction…';
+
+  edgeEl.textContent = edge != null ? (edge >= 0 ? '+' : '') + fmt(edge, 3) : '—';
+  edgeEl.style.color = edge > 0 ? 'var(--green)' : edge < 0 ? 'var(--red)' : 'var(--muted)';
+}
+
+// ─────────────────────────────────────────────
+// Stats cards
+// ─────────────────────────────────────────────
+function updateStats(s) {
+  if (!s || s.error) return;
+
+  const eq = $('equity');
+  eq.textContent = '$' + fmt(s.current_equity, 0);
+
+  const pnlEl = $('pnl');
+  const pnl   = s.total_pnl || 0;
+  pnlEl.textContent = (pnl >= 0 ? '+$' : '-$') + fmt(Math.abs(pnl), 2);
+  pnlEl.className   = 'card-value ' + (pnl >= 0 ? 'green' : 'red');
+  $('pnl-sub').textContent = s.n_predictions + ' predictions';
+
+  const hr  = s.hit_rate;
+  const hrEl = $('hitrate');
+  hrEl.textContent = hr != null ? fmt(hr * 100, 1) + '%' : '—';
+  hrEl.className   = 'card-value ' + (hr > 0.52 ? 'green' : hr < 0.48 ? 'red' : 'amber');
+  $('hitrate-sub').textContent = s.n_resolved + ' resolved';
+
+  const br  = s.brier_score;
+  const brEl = $('brier');
+  brEl.textContent = br != null ? fmt(br, 4) : '—';
+  brEl.className   = 'card-value ' + (br < 0.24 ? 'green' : br < 0.25 ? 'amber' : 'red');
+}
+
+// ─────────────────────────────────────────────
+// Prediction rows
+// ─────────────────────────────────────────────
+function updatePredictions(preds) {
+  const container = $('pred-list');
+  if (!preds.length) return;
+
+  container.innerHTML = preds.map(p => {
+    const dir  = (p.direction || '').toLowerCase();
+    const res  = p.resolved_up;
+    const pnl  = p.pnl_net;
+    let pnlHtml;
+    if (res === null || res === undefined) {
+      pnlHtml = `<div class="pred-pnl pending">•••</div>`;
+    } else {
+      const pnlNum = pnl || 0;
+      const cls = pnlNum >= 0 ? 'pos' : 'neg';
+      pnlHtml = `<div class="pred-pnl ${cls}">${pnlNum >= 0 ? '+' : ''}$${fmt(Math.abs(pnlNum), 2)}</div>`;
+    }
+    const prob = fmt(p.p_model * 100, 1) + '%';
+    const mkt  = fmt(p.market_mid * 100, 1) + '%';
+    const time = fmtTime(p.ts_s);
+    return `
+    <div class="pred-row">
+      <div class="pred-dir ${dir}">${dir.toUpperCase()}</div>
+      <div class="pred-body">
+        <div class="pred-prob">p=${prob}  m=${mkt}</div>
+        <div class="pred-detail">${time} · $${fmt(p.bet_usdc,1)}</div>
+      </div>
+      ${pnlHtml}
+    </div>`;
+  }).join('');
+}
+
+// ─────────────────────────────────────────────
+// Countdown ticker (client-side 1-second tick)
+// ─────────────────────────────────────────────
+let windowCloseTs = 0;
+setInterval(() => {
+  if (!windowCloseTs) return;
+  const r  = Math.max(0, windowCloseTs - Math.floor(Date.now() / 1000));
+  const mm = String(Math.floor(r / 60)).padStart(2, '0');
+  const ss = String(r % 60).padStart(2, '0');
+  $('countdown').textContent = `${mm}:${ss}`;
+}, 1000);
+
+// Capture window_close_ts from status polls
+const _origUpdateMarket = updateMarket;
+function updateMarket(s) {
+  windowCloseTs = s.window_close_ts;
+  _origUpdateMarket(s);
+}
+
+// ─────────────────────────────────────────────
+// Resize: redraw canvases on orientation change
+// ─────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  drawSpark(priceHistory);
+  drawEquity(equityData);
+});
+
+// ─────────────────────────────────────────────
+// Start polling
+// ─────────────────────────────────────────────
+pollStatus();
+setInterval(pollStatus, 2000);
+</script>
+</body>
+</html>

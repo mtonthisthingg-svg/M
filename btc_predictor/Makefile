@@ -7,6 +7,7 @@
 # make train         — train the ensemble model
 # make backtest      — run backtest on saved historical data
 # make test          — run all tests (including no-lookahead tests)
+# make web           — start mobile web dashboard (open on phone)
 # make live          — start live executor (dry-run by default)
 # make dashboard     — launch Streamlit monitoring dashboard
 # make lint          — run ruff linter
@@ -17,12 +18,19 @@ MODEL_DIR := models/saved
 LOG_DIR := logs
 DB_PATH := data/monitoring.db
 
-.PHONY: all install inspect record fetch-history train backtest test live dashboard lint clean
+.PHONY: all install inspect record fetch-history train backtest test web live dashboard lint clean
 
 all: install
 
 install:
 	$(PYTHON) -m pip install -r btc_predictor/requirements.txt
+
+# -----------------------------------------------------------------------
+# Mobile web dashboard — open the printed URL on your phone
+# -----------------------------------------------------------------------
+web:
+	@$(PYTHON) -m pip install fastapi uvicorn --quiet
+	$(PYTHON) -m btc_predictor.web.app
 
 # -----------------------------------------------------------------------
 # Market inspection — ALWAYS run this before training to verify oracle

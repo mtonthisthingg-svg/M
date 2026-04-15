@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="theme-color" content="#000000">
+<title>BTC Predictor</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+:root{
+  --bg:#000;--card:#111;--border:#1e1e1e;
+  --green:#00ff87;--red:#ff3b5c;--blue:#3d8eff;--amber:#ffb800;
+  --text:#f0f0f0;--muted:#555;
+}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;
+  background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Header ── */
+header{
+  display:flex;justify-content:space-between;align-items:center;
+  padding:14px 16px 10px;
+  border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:99;
+  background:rgba(0,0,0,0.92);backdrop-filter:blur(16px);
+}
+.logo{font-size:15px;font-weight:700;letter-spacing:-.02em}
+.logo span{color:var(--green)}
+.conn{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.dot.on{background:var(--green);box-shadow:0 0 8px var(--green);animation:pulse 2s infinite}
+.dot.err{background:var(--red)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.5}}
+
+/* ── Price block ── */
+.price-block{
+  text-align:center;padding:28px 16px 20px;
+  border-bottom:1px solid var(--border);
+}
+.oracle-lbl{
+  font-size:10px;color:var(--muted);letter-spacing:.14em;
+  text-transform:uppercase;margin-bottom:6px;
+}
+.price-main{
+  font-size:52px;font-weight:800;letter-spacing:-.04em;
+  font-variant-numeric:tabular-nums;line-height:1;
+  transition:color .25s;
+}
+.price-main.up{color:var(--green)}
+.price-main.dn{color:var(--red)}
+.price-delta{
+  font-size:14px;margin-top:6px;font-variant-numeric:tabular-nums;
+  color:var(--muted);transition:color .25s;
+}
+.price-delta.pos{color:var(--green)}
+.price-delta.neg{color:var(--red)}
+
+/* ── Sparkline ── */
+.spark-wrap{height:56px;padding:0 12px 4px;border-bottom:1px solid var(--border)}
+canvas#spark{width:100%;height:52px;display:block}
+
+/* ── Oracle lead pill ── */
+.lead-bar{
+  display:flex;align-items:center;justify-content:center;
+  gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);
+  font-size:12px;
+}
+.lead-pill{
+  padding:4px 10px;border-radius:100px;font-size:11px;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:.01em;
+}
+.lead-pill.pos{background:rgba(0,255,135,.1);color:var(--green)}
+.lead-pill.neg{background:rgba(255,59,92,.1);color:var(--red)}
+.lead-pill.zero{background:rgba(255,255,255,.05);color:var(--muted)}
+.lead-lbl{color:var(--muted);font-size:11px}
+
+/* ── Market countdown ── */
+.market-wrap{padding:12px 12px 0}
+.market-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:14px;
+}
+.mkt-row{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px}
+.mkt-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:2px}
+.mkt-slug{font-size:10px;color:var(--blue);font-family:monospace;margin-top:2px}
+.countdown{
+  font-size:34px;font-weight:800;font-variant-numeric:tabular-nums;
+  letter-spacing:-.03em;line-height:1;
+}
+.countdown.ending{color:var(--amber)}
+.progress{background:var(--border);border-radius:100px;height:4px;overflow:hidden}
+.progress-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--blue),var(--green));transition:width 1s linear}
+.progress-fill.end{background:linear-gradient(90deg,var(--amber),var(--red))}
+.mkt-prices{display:flex;justify-content:space-between;margin-top:8px;font-size:11px;color:var(--muted)}
+.mkt-prices span b{color:var(--text);font-variant-numeric:tabular-nums}
+
+/* ── Stats grid ── */
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:12px}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px}
+.stat-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px}
+.stat-val{font-size:24px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.stat-val.g{color:var(--green)}
+.stat-val.r{color:var(--red)}
+.stat-val.a{color:var(--amber)}
+.stat-sub{font-size:10px;color:var(--muted);margin-top:3px}
+
+/* ── Implied prob bar ── */
+.prob-wrap{padding:0 12px 12px}
+.prob-card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:14px}
+.prob-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:8px}
+.prob-track{background:var(--border);border-radius:100px;height:8px;overflow:hidden;position:relative}
+.prob-up{height:100%;border-radius:100px;background:var(--green);transition:width .6s ease}
+.prob-nums{display:flex;justify-content:space-between;margin-top:6px;font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.prob-nums .u{color:var(--green)}
+.prob-nums .d{color:var(--red)}
+
+/* ── Trades ── */
+.trades-lbl{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;padding:4px 12px 6px}
+.trades{padding:0 12px 24px;display:flex;flex-direction:column;gap:6px}
+.trade{
+  background:var(--card);border:1px solid var(--border);border-radius:12px;
+  padding:10px 12px;display:flex;align-items:center;gap:10px;
+}
+.trade-dir{
+  width:36px;height:36px;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-size:16px;flex-shrink:0;
+}
+.trade-dir.up{background:rgba(0,255,135,.1)}
+.trade-dir.dn{background:rgba(255,59,92,.1)}
+.trade-body{flex:1;min-width:0}
+.trade-pair{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+.trade-meta{font-size:10px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.trade-pnl{font-size:13px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.trade-pnl.pos{color:var(--green)}
+.trade-pnl.neg{color:var(--red)}
+.trade-pnl.pend{color:var(--muted);font-size:11px}
+
+/* ── Flash ── */
+@keyframes flashUp{0%{background:rgba(0,255,135,.15)}100%{background:transparent}}
+@keyframes flashDn{0%{background:rgba(255,59,92,.15)}100%{background:transparent}}
+.flash-up{animation:flashUp .35s ease}
+.flash-dn{animation:flashDn .35s ease}
+
+/* ── Error toast ── */
+.toast{
+  position:fixed;bottom:20px;left:50%;transform:translateX(-50%);
+  background:#1a1a1a;border:1px solid var(--border);border-radius:10px;
+  padding:10px 16px;font-size:12px;color:var(--muted);
+  opacity:0;transition:opacity .3s;pointer-events:none;white-space:nowrap;
+  z-index:999;
+}
+.toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">BTC <span>Predictor</span></div>
+  <div class="conn"><div class="dot" id="dot"></div><span id="conn-lbl">connecting</span></div>
+</header>
+
+<div class="price-block">
+  <div class="oracle-lbl">Chainlink BTC / USD · Resolution Oracle</div>
+  <div class="price-main" id="price">—</div>
+  <div class="price-delta" id="delta"></div>
+</div>
+
+<div class="spark-wrap">
+  <canvas id="spark"></canvas>
+</div>
+
+<div class="lead-bar">
+  <span class="lead-lbl">Binance lead</span>
+  <span class="lead-pill zero" id="lead-pill">—</span>
+  <span class="lead-lbl" id="binance-px" style="font-variant-numeric:tabular-nums"></span>
+</div>
+
+<div class="market-wrap">
+  <div class="market-card">
+    <div class="mkt-row">
+      <div>
+        <div class="mkt-lbl">Current Window</div>
+        <div class="mkt-slug" id="mkt-slug">—</div>
+      </div>
+      <div>
+        <div class="mkt-lbl" style="text-align:right">Remaining</div>
+        <div class="countdown" id="cdown">—:——</div>
+      </div>
+    </div>
+    <div class="progress"><div class="progress-fill" id="pfill" style="width:0%"></div></div>
+    <div class="mkt-prices">
+      <span>Open <b id="open-px">—</b></span>
+      <span>Gap <b id="gap-px">—</b></span>
+      <span>Now <b id="now-px">—</b></span>
+    </div>
+  </div>
+</div>
+
+<div class="stats">
+  <div class="stat">
+    <div class="stat-lbl">Binance Bid</div>
+    <div class="stat-val" id="bnb-bid">—</div>
+    <div class="stat-sub">best bid</div>
+  </div>
+  <div class="stat">
+    <div class="stat-lbl">Binance Ask</div>
+    <div class="stat-val" id="bnb-ask">—</div>
+    <div class="stat-sub">best ask</div>
+  </div>
+  <div class="stat">
+    <div class="stat-lbl">24h Volume</div>
+    <div class="stat-val" id="vol24">—</div>
+    <div class="stat-sub">BTC traded</div>
+  </div>
+  <div class="stat">
+    <div class="stat-lbl">24h Change</div>
+    <div class="stat-val" id="chg24">—</div>
+    <div class="stat-sub">price change</div>
+  </div>
+</div>
+
+<div class="prob-wrap">
+  <div class="prob-card">
+    <div class="prob-lbl">Polymarket Implied Probability</div>
+    <div class="prob-track"><div class="prob-up" id="prob-bar" style="width:50%"></div></div>
+    <div class="prob-nums">
+      <span class="u" id="prob-up">UP —%</span>
+      <span class="d" id="prob-dn">DOWN —%</span>
+    </div>
+  </div>
+</div>
+
+<div class="trades-lbl">Live Binance Trades</div>
+<div class="trades" id="trades"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── Utilities ────────────────────────────────────
+const $=id=>document.getElementById(id);
+const fmt=(n,d=2)=>n==null?'—':Number(n).toLocaleString('en-US',{minimumFractionDigits:d,maximumFractionDigits:d});
+const fmtK=n=>n>=1e9?fmt(n/1e9,2)+'B':n>=1e6?fmt(n/1e6,2)+'M':n>=1e3?fmt(n/1e3,1)+'K':fmt(n,0);
+
+function toast(msg,dur=3000){
+  const t=$('toast');t.textContent=msg;t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'),dur);
+}
+
+function flash(el,cls){
+  el.classList.remove('flash-up','flash-dn');
+  void el.offsetWidth;
+  el.classList.add(cls);
+}
+
+// ─── State ────────────────────────────────────────
+const WINDOW = 300; // 5-min markets
+let clPrice   = 0;
+let bnbPrice  = 0;
+let bnbBid    = 0;
+let bnbAsk    = 0;
+let prevCl    = 0;
+let openPrice = 0;   // chainlink at window open
+let priceHist = [];  // [{t,p}]
+let windowCloseTs = 0;
+
+// ─── Countdown ────────────────────────────────────
+setInterval(()=>{
+  const now = Math.floor(Date.now()/1000);
+  const windowOpen  = now - (now % WINDOW);
+  const windowClose = windowOpen + WINDOW;
+  const remaining   = windowClose - now;
+  const elapsed     = now - windowOpen;
+  const pct         = elapsed / WINDOW;
+
+  // Update open price at window boundary
+  if(windowClose !== windowCloseTs){
+    windowCloseTs = windowClose;
+    openPrice = clPrice || 0;
+  }
+
+  const mm = String(Math.floor(remaining/60)).padStart(2,'0');
+  const ss = String(remaining%60).padStart(2,'0');
+  const cdown = $('cdown');
+  cdown.textContent = `${mm}:${ss}`;
+  cdown.className   = 'countdown' + (remaining<60?' ending':'');
+
+  const fill = $('pfill');
+  fill.style.width = Math.min(100,pct*100).toFixed(1)+'%';
+  fill.className = 'progress-fill' + (remaining<60?' end':'');
+
+  $('mkt-slug').textContent = `btc-updown-5m-${windowOpen}`;
+
+  if(openPrice>0 && clPrice>0){
+    const gap = clPrice - openPrice;
+    const gapBps = (gap/openPrice*10000).toFixed(1);
+    $('open-px').textContent = '$'+fmt(openPrice,0);
+    $('gap-px').textContent  = (gap>=0?'+':'')+gapBps+'bps';
+    $('gap-px').parentElement.style.color = gap>=0?'var(--green)':'var(--red)';
+    $('now-px').textContent  = '$'+fmt(clPrice,0);
+  }
+},1000);
+
+// ─── Sparkline ────────────────────────────────────
+function drawSpark(){
+  const c=$('spark'),dpr=devicePixelRatio||1;
+  const w=c.offsetWidth,h=c.offsetHeight||52;
+  c.width=w*dpr; c.height=h*dpr;
+  const ctx=c.getContext('2d'); ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,w,h);
+  if(priceHist.length<2)return;
+  const ps=priceHist.map(x=>x.p);
+  const mn=Math.min(...ps),mx=Math.max(...ps),rng=mx-mn||1;
+  const sx=i=>(i/(priceHist.length-1))*w;
+  const sy=v=>h-((v-mn)/rng)*(h*.8)-h*.1;
+  const up=ps[ps.length-1]>=ps[0];
+  const col=up?'#00ff87':'#ff3b5c';
+  const gr=ctx.createLinearGradient(0,0,0,h);
+  gr.addColorStop(0,up?'rgba(0,255,135,.2)':'rgba(255,59,92,.2)');
+  gr.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.beginPath();
+  ctx.moveTo(sx(0),sy(ps[0]));
+  for(let i=1;i<ps.length;i++)ctx.lineTo(sx(i),sy(ps[i]));
+  ctx.lineTo(w,h);ctx.lineTo(0,h);ctx.closePath();
+  ctx.fillStyle=gr;ctx.fill();
+  ctx.beginPath();
+  ctx.moveTo(sx(0),sy(ps[0]));
+  for(let i=1;i<ps.length;i++)ctx.lineTo(sx(i),sy(ps[i]));
+  ctx.strokeStyle=col;ctx.lineWidth=1.5;ctx.stroke();
+  // dot
+  const lx=sx(ps.length-1),ly=sy(ps[ps.length-1]);
+  ctx.beginPath();ctx.arc(lx,ly,3,0,Math.PI*2);
+  ctx.fillStyle=col;ctx.fill();
+}
+window.addEventListener('resize',drawSpark);
+
+// ─── Chainlink via Polymarket RTDS ────────────────
+function connectChainlink(){
+  const ws=new WebSocket('wss://ws-live-data.polymarket.com');
+  ws.onopen=()=>{
+    ws.send(JSON.stringify({
+      action:'subscribe',
+      subscriptions:[{
+        topic:'crypto_prices_chainlink',
+        type:'*',
+        filters:JSON.stringify({symbol:'btc/usd'})
+      }]
+    }));
+    $('dot').className='dot on';
+    $('conn-lbl').textContent='live · chainlink';
+  };
+  ws.onmessage=e=>{
+    try{
+      const msg=JSON.parse(e.data);
+      if(msg.topic!=='crypto_prices_chainlink')return;
+      const p=msg.payload||{};
+      const price=parseFloat(p.value);
+      if(!price||isNaN(price))return;
+      const prev=clPrice;
+      clPrice=price;
+      const priceEl=$('price');
+      priceEl.textContent='$'+fmt(price,2);
+      if(prev){
+        const up=price>=prev;
+        priceEl.className='price-main '+(up?'up':'dn');
+        flash(priceEl,up?'flash-up':'flash-dn');
+        const d=price-prev;
+        const dEl=$('delta');
+        dEl.textContent=(d>=0?'+':'')+fmt(d,2)+' ('+(d>=0?'+':'')+fmt(d/prev*100,3)+'%)';
+        dEl.className='price-delta '+(d>=0?'pos':'neg');
+      }
+      priceHist.push({t:p.timestamp,p:price});
+      if(priceHist.length>120)priceHist.shift();
+      drawSpark();
+      updateLead();
+    }catch(err){}
+  };
+  ws.onerror=()=>{
+    $('dot').className='dot err';
+    $('conn-lbl').textContent='error';
+  };
+  ws.onclose=()=>{
+    $('dot').className='dot err';
+    $('conn-lbl').textContent='reconnecting…';
+    setTimeout(connectChainlink,3000);
+  };
+}
+
+// ─── Binance WebSocket ────────────────────────────
+function connectBinance(){
+  const ws=new WebSocket('wss://stream.binance.com:9443/ws/btcusdt@bookTicker/btcusdt@aggTrade');
+  ws.onmessage=e=>{
+    try{
+      const d=JSON.parse(e.data);
+      if(d.b&&d.a){ // bookTicker
+        bnbBid=parseFloat(d.b);
+        bnbAsk=parseFloat(d.a);
+        bnbPrice=(bnbBid+bnbAsk)/2;
+        const bidEl=$('bnb-bid'),askEl=$('bnb-ask');
+        bidEl.textContent='$'+fmt(bnbBid,0);
+        askEl.textContent='$'+fmt(bnbAsk,0);
+        bidEl.className='stat-val g';
+        askEl.className='stat-val r';
+        $('binance-px').textContent='Binance $'+fmt(bnbPrice,2);
+        updateLead();
+      }
+      if(d.e==='aggTrade'){ // trade
+        addTrade(d);
+      }
+    }catch(err){}
+  };
+  ws.onclose=()=>setTimeout(connectBinance,3000);
+}
+
+// ─── Oracle lead ──────────────────────────────────
+function updateLead(){
+  if(!clPrice||!bnbPrice)return;
+  const lead=bnbPrice-clPrice;
+  const bps=(lead/clPrice*10000);
+  const pill=$('lead-pill');
+  pill.textContent=(bps>=0?'+':'')+bps.toFixed(1)+' bps';
+  pill.className='lead-pill '+(Math.abs(bps)<0.5?'zero':bps>0?'pos':'neg');
+}
+
+// ─── Live trades ──────────────────────────────────
+let tradeCount=0;
+function addTrade(d){
+  const isBuy=!d.m; // m=true means seller was maker → buyer was taker
+  const price=parseFloat(d.p);
+  const qty=parseFloat(d.q);
+  const usdc=price*qty;
+  const container=$('trades');
+  const row=document.createElement('div');
+  row.className='trade';
+  row.innerHTML=`
+    <div class="trade-dir ${isBuy?'up':'dn'}">${isBuy?'▲':'▼'}</div>
+    <div class="trade-body">
+      <div class="trade-pair">$${fmt(price,2)}</div>
+      <div class="trade-meta">${fmt(qty,4)} BTC · $${fmtK(usdc)}</div>
+    </div>
+    <div class="trade-pnl ${isBuy?'pos':'neg'}">${isBuy?'BUY':'SELL'}</div>`;
+  container.insertBefore(row,container.firstChild);
+  if(container.children.length>12)container.lastChild.remove();
+  tradeCount++;
+}
+
+// ─── Binance REST (24h ticker + orderbook) ────────
+async function fetchBinanceRest(){
+  try{
+    const r=await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCUSDT');
+    const d=await r.json();
+    const chg=parseFloat(d.priceChangePercent);
+    const vol=parseFloat(d.volume);
+    const chgEl=$('chg24');
+    chgEl.textContent=(chg>=0?'+':'')+fmt(chg,2)+'%';
+    chgEl.className='stat-val '+(chg>=0?'g':'r');
+    $('vol24').textContent=fmtK(vol);
+    $('vol24').className='stat-val';
+  }catch(e){}
+}
+
+// ─── Polymarket implied prob ──────────────────────
+async function fetchPolymarket(){
+  try{
+    const now=Math.floor(Date.now()/1000);
+    const open=now-(now%WINDOW);
+    const slug=`btc-updown-5m-${open}`;
+    const r=await fetch(`https://gamma-api.polymarket.com/markets?slug=${slug}`);
+    const data=await r.json();
+    if(!data||!data.length)return;
+    const m=data[0];
+    // outcomePrices: ["0.55","0.45"] = [up,down]
+    const prices=m.outcomePrices;
+    if(prices&&prices.length>=2){
+      const up=parseFloat(prices[0]);
+      const dn=parseFloat(prices[1]);
+      $('prob-bar').style.width=(up*100).toFixed(1)+'%';
+      $('prob-up').textContent=`UP ${(up*100).toFixed(1)}%`;
+      $('prob-dn').textContent=`DOWN ${(dn*100).toFixed(1)}%`;
+    }
+  }catch(e){}
+}
+
+// ─── Init ─────────────────────────────────────────
+connectChainlink();
+connectBinance();
+fetchBinanceRest();
+fetchPolymarket();
+setInterval(fetchBinanceRest, 30000);
+setInterval(fetchPolymarket, 5000);
+</script>
+</body>
+</html>

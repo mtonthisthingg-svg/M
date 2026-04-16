@@ -1,0 +1,500 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polymarket Whale Tracker</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0b0e;--surface:#111318;--border:#1e2028;--border2:#2a2d3a;
+  --text:#e2e8f0;--muted:#6b7280;--accent:#00d4aa;--accent2:#7c3aed;
+  --yes:#10b981;--no:#ef4444;--warn:#f59e0b;--red:#ef4444;
+}
+body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;font-size:14px;min-height:100vh}
+a{color:var(--accent);text-decoration:none}
+
+/* layout */
+header{padding:18px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100;background:var(--bg)}
+header h1{font-size:18px;font-weight:700;color:var(--accent);letter-spacing:.5px}
+header .sub{color:var(--muted);font-size:12px}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex-shrink:0;transition:background .3s}
+.status-dot.live{background:var(--yes);box-shadow:0 0 6px var(--yes)}
+.status-dot.err{background:var(--red)}
+.header-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+#last-updated{font-size:11px;color:var(--muted)}
+#refresh-btn{padding:5px 12px;border:1px solid var(--border2);border-radius:6px;background:transparent;color:var(--text);cursor:pointer;font-size:12px}
+#refresh-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+/* tabs */
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--border);padding:0 24px;background:var(--surface)}
+.tab{padding:12px 18px;cursor:pointer;color:var(--muted);font-size:13px;font-weight:500;border-bottom:2px solid transparent;transition:all .2s;white-space:nowrap}
+.tab:hover{color:var(--text)}
+.tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* main */
+main{padding:24px;max-width:1400px;margin:0 auto}
+.pane{display:none}
+.pane.active{display:block}
+
+/* loading */
+#loader{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:320px;gap:16px}
+.spinner{width:36px;height:36px;border:3px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-msg{color:var(--muted);font-size:13px}
+.progress-bar{width:260px;height:4px;background:var(--border2);border-radius:2px;overflow:hidden}
+.progress-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));width:0%;transition:width .3s}
+
+/* error banner */
+#error-banner{display:none;padding:14px 20px;background:#1a0a0a;border:1px solid #3d1515;border-radius:8px;color:var(--red);margin-bottom:20px;font-size:13px}
+
+/* cards */
+.stat-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.stat-card .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px}
+.stat-card .value{font-size:24px;font-weight:700;color:var(--text)}
+.stat-card .value.green{color:var(--yes)}
+.stat-card .value.purple{color:var(--accent2)}
+
+/* tables */
+.table-wrap{overflow-x:auto;border-radius:10px;border:1px solid var(--border)}
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--surface);padding:10px 14px;text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;border-bottom:1px solid var(--border);white-space:nowrap}
+tbody tr{border-bottom:1px solid var(--border);transition:background .15s;cursor:pointer}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.03)}
+tbody tr.selected{background:rgba(0,212,170,.05);outline:1px solid rgba(0,212,170,.2)}
+td{padding:10px 14px;vertical-align:middle;white-space:nowrap}
+td.wrap{white-space:normal;max-width:360px}
+
+/* badges */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:100px;font-size:11px;font-weight:600;gap:4px}
+.badge.yes{background:rgba(16,185,129,.12);color:var(--yes)}
+.badge.no{background:rgba(239,68,68,.12);color:var(--no)}
+.badge.hot{background:rgba(245,158,11,.12);color:var(--warn)}
+
+/* conviction bar */
+.conv-bar{display:flex;align-items:center;gap:8px}
+.conv-track{width:80px;height:6px;background:var(--border2);border-radius:3px;overflow:hidden;flex-shrink:0}
+.conv-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+.conv-num{font-size:12px;color:var(--muted)}
+
+/* address */
+.addr{font-family:monospace;font-size:12px;color:var(--muted);cursor:pointer;transition:color .15s}
+.addr:hover{color:var(--accent)}
+
+/* pnl */
+.pos{color:var(--yes)}
+.neg{color:var(--no)}
+
+/* signals */
+.signal-grid{display:grid;gap:12px}
+.signal-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px;cursor:pointer;transition:border-color .2s}
+.signal-card:hover{border-color:var(--accent2)}
+.signal-card.expanded{border-color:var(--accent)}
+.signal-top{display:flex;align-items:flex-start;gap:12px}
+.signal-title{font-weight:600;font-size:14px;line-height:1.4;flex:1}
+.signal-meta{display:flex;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.whale-chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none}
+.signal-card.expanded .whale-chips{display:flex}
+.chip{background:var(--border);border-radius:6px;padding:4px 8px;font-size:11px;font-family:monospace}
+
+/* kelly box */
+.kelly-box{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:24px}
+.kelly-box h3{font-size:13px;font-weight:600;color:var(--accent);margin-bottom:14px}
+.kelly-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.kelly-row label{font-size:12px;color:var(--muted)}
+.kelly-row input{background:var(--bg);border:1px solid var(--border2);border-radius:6px;padding:6px 10px;color:var(--text);font-size:13px;width:140px}
+.kelly-row input:focus{outline:none;border-color:var(--accent)}
+.kelly-results{margin-top:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px}
+.kelly-item{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px}
+.kelly-item .mkt{font-size:12px;color:var(--muted);margin-bottom:4px;line-height:1.3}
+.kelly-item .bet{font-size:18px;font-weight:700;color:var(--yes)}
+.kelly-item .ev{font-size:11px;color:var(--muted);margin-top:3px}
+
+/* wallet detail panel */
+#wallet-detail{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:20px;display:none}
+#wallet-detail h3{font-size:13px;font-weight:600;margin-bottom:14px;color:var(--accent)}
+
+/* responsive */
+@media(max-width:640px){
+  main{padding:14px}
+  .stat-cards{grid-template-columns:repeat(2,1fr)}
+  .tabs .tab{padding:10px 12px;font-size:12px}
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="status-dot" id="status-dot"></div>
+  <div>
+    <h1>Polymarket Whale Tracker</h1>
+    <div class="sub">Top wallets • Smart money signals • Copy-trade intelligence</div>
+  </div>
+  <div class="header-right">
+    <span id="last-updated"></span>
+    <button id="refresh-btn" onclick="loadAll(true)">↻ Refresh</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-tab="signals">Smart Money Signals</div>
+  <div class="tab" data-tab="leaderboard">Leaderboard</div>
+  <div class="tab" data-tab="wallet">Wallet Deep-Dive</div>
+</div>
+
+<main>
+  <div id="error-banner"></div>
+
+  <!-- ── LOADER ── -->
+  <div id="loader">
+    <div class="spinner"></div>
+    <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    <div class="loader-msg" id="loader-msg">Fetching top traders…</div>
+  </div>
+
+  <!-- ── SIGNALS TAB ── -->
+  <div class="pane" id="pane-signals">
+    <div class="stat-cards" id="stat-cards"></div>
+
+    <div class="kelly-box">
+      <h3>Kelly Criterion Bet Sizing</h3>
+      <div class="kelly-row">
+        <label>Your bankroll ($)</label>
+        <input type="number" id="bankroll" value="1000" min="1" oninput="renderKelly()">
+        <label style="margin-left:8px">Half-Kelly (safer)</label>
+        <input type="checkbox" id="half-kelly" checked oninput="renderKelly()">
+      </div>
+      <div class="kelly-results" id="kelly-results"></div>
+    </div>
+
+    <div class="signal-grid" id="signal-grid"></div>
+  </div>
+
+  <!-- ── LEADERBOARD TAB ── -->
+  <div class="pane" id="pane-leaderboard">
+    <div id="wallet-detail">
+      <h3 id="wallet-detail-title">Positions</h3>
+      <div class="table-wrap"><table id="wallet-pos-table">
+        <thead><tr>
+          <th>Market</th><th>Side</th><th>Size</th><th>Avg Buy</th><th>Current</th><th>P&amp;L</th><th>%</th>
+        </tr></thead>
+        <tbody id="wallet-pos-body"></tbody>
+      </table></div>
+    </div>
+    <div class="table-wrap">
+      <table id="lb-table">
+        <thead><tr>
+          <th>#</th><th>Wallet</th><th>P&amp;L (30d)</th><th>Volume</th><th>Positions</th><th>Twitter</th>
+        </tr></thead>
+        <tbody id="lb-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ── WALLET TAB ── -->
+  <div class="pane" id="pane-wallet">
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:20px;flex-wrap:wrap">
+      <input id="wallet-input" placeholder="Enter wallet address (0x…)" style="flex:1;min-width:280px;background:var(--surface);border:1px solid var(--border2);border-radius:8px;padding:9px 14px;color:var(--text);font-size:13px;font-family:monospace">
+      <button onclick="loadWallet()" style="padding:9px 18px;background:var(--accent);color:#000;border:none;border-radius:8px;cursor:pointer;font-weight:600;font-size:13px">Load</button>
+    </div>
+    <div id="wallet-tab-content"><p style="color:var(--muted);text-align:center;padding:40px 0">Enter a wallet address above, or click any address in the Leaderboard.</p></div>
+  </div>
+</main>
+
+<script>
+// ── state ────────────────────────────────────────────────────────────────────
+let DATA = null;   // { traders, signals, fetchedAt }
+let REFRESH_TIMER = null;
+const REFRESH_MS = 3 * 60 * 1000;
+
+// ── tabs ─────────────────────────────────────────────────────────────────────
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    document.querySelectorAll('.pane').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('pane-' + t.dataset.tab).classList.add('active');
+  });
+});
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+function fmt$(n) {
+  if (n == null) return '—';
+  const abs = Math.abs(n);
+  const prefix = n < 0 ? '-$' : '$';
+  if (abs >= 1e6) return prefix + (abs / 1e6).toFixed(2) + 'M';
+  if (abs >= 1e3) return prefix + (abs / 1e3).toFixed(1) + 'K';
+  return prefix + abs.toFixed(0);
+}
+function fmtPct(n) {
+  if (n == null) return '—';
+  return (n >= 0 ? '+' : '') + n.toFixed(1) + '%';
+}
+function shortAddr(a) {
+  if (!a) return '—';
+  return a.slice(0, 6) + '…' + a.slice(-4);
+}
+function copyAddr(a) {
+  navigator.clipboard?.writeText(a).catch(() => {});
+}
+function pnlClass(n) { return n >= 0 ? 'pos' : 'neg'; }
+
+function setProgress(pct, msg) {
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('loader-msg').textContent = msg;
+}
+function showLoader(v) {
+  document.getElementById('loader').style.display = v ? 'flex' : 'none';
+}
+function showError(msg) {
+  const b = document.getElementById('error-banner');
+  if (msg) { b.textContent = msg; b.style.display = 'block'; }
+  else { b.style.display = 'none'; }
+}
+function setStatus(state) {
+  const d = document.getElementById('status-dot');
+  d.className = 'status-dot' + (state === 'live' ? ' live' : state === 'err' ? ' err' : '');
+}
+
+// ── load all data (single server call) ───────────────────────────────────────
+async function loadAll(force = false) {
+  showLoader(true);
+  showError('');
+  setStatus('');
+  setProgress(10, 'Contacting Polymarket…');
+  document.querySelectorAll('.pane').forEach(p => p.classList.remove('active'));
+
+  try {
+    setProgress(30, 'Fetching top traders & positions…');
+    const url = '/api/whale-signals?top=25&period=MONTH' + (force ? '&_=' + Date.now() : '');
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Server error ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    setProgress(90, 'Processing signals…');
+    DATA = data;
+
+    setProgress(100, 'Done');
+    await new Promise(r => setTimeout(r, 200));
+    showLoader(false);
+    setStatus('live');
+
+    const ts = data.fetchedAt ? new Date(data.fetchedAt).toLocaleTimeString() : '';
+    document.getElementById('last-updated').textContent = ts ? 'Updated ' + ts : '';
+
+    renderSignals();
+    renderLeaderboard();
+
+    // activate first tab
+    document.querySelectorAll('.tab')[0].click();
+
+    // schedule refresh
+    clearTimeout(REFRESH_TIMER);
+    REFRESH_TIMER = setTimeout(() => loadAll(), REFRESH_MS);
+
+  } catch (err) {
+    showLoader(false);
+    setStatus('err');
+    showError('Failed to load data: ' + err.message + '. Check that the server is running and Polymarket APIs are reachable.');
+    document.querySelectorAll('.pane')[0].classList.add('active');
+    console.error(err);
+  }
+}
+
+// ── signals tab ──────────────────────────────────────────────────────────────
+function renderSignals() {
+  if (!DATA) return;
+  const { traders, signals } = DATA;
+
+  // stat cards
+  const totalPnl = traders.reduce((s, t) => s + (t.pnl || 0), 0);
+  const totalVol  = traders.reduce((s, t) => s + (t.volume || 0), 0);
+  document.getElementById('stat-cards').innerHTML = `
+    <div class="stat-card"><div class="label">Traders tracked</div><div class="value purple">${traders.length}</div></div>
+    <div class="stat-card"><div class="label">Signal markets</div><div class="value">${signals.length}</div></div>
+    <div class="stat-card"><div class="label">Combined 30d P&L</div><div class="value green">${fmt$(totalPnl)}</div></div>
+    <div class="stat-card"><div class="label">Combined volume</div><div class="value">${fmt$(totalVol)}</div></div>
+  `;
+
+  // max conviction for bar scaling
+  const maxConv = signals.length ? signals[0].convictionScore : 1;
+
+  const grid = document.getElementById('signal-grid');
+  if (!signals.length) {
+    grid.innerHTML = '<p style="color:var(--muted);padding:40px 0;text-align:center">No multi-whale markets found. The leaderboard may have returned limited position data.</p>';
+    renderKelly();
+    return;
+  }
+
+  grid.innerHTML = signals.map((s, i) => {
+    const pct = Math.round((s.convictionScore / maxConv) * 100);
+    const dirClass = s.direction === 'YES' ? 'yes' : 'no';
+    const hot = s.whaleCount >= 4 ? '<span class="badge hot">🔥 HOT</span>' : s.whaleCount >= 3 ? '<span class="badge hot">⚡</span>' : '';
+    const whaleChips = s.whales.map(w =>
+      `<div class="chip" title="${w.address}">#${w.rank} ${shortAddr(w.address)} · ${w.outcome} · ${fmt$(w.currentValue)}</div>`
+    ).join('');
+    return `
+    <div class="signal-card" id="sig-${i}" onclick="toggleSignal(${i})">
+      <div class="signal-top">
+        <div style="flex:1">
+          <div class="signal-title">${s.title}</div>
+          <div class="signal-meta">
+            <span class="badge ${dirClass}">${s.direction} ${s.yesCount}v${s.noCount}</span>
+            ${hot}
+            <span style="font-size:12px;color:var(--muted)">${s.whaleCount} whales · ${fmt$(s.totalWhaleValue)} at stake</span>
+            <span style="font-size:12px;color:var(--muted)">Avg price <strong style="color:var(--text)">${(s.avgPrice * 100).toFixed(0)}¢</strong></span>
+          </div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div class="conv-bar" style="justify-content:flex-end">
+            <div class="conv-track"><div class="conv-fill" style="width:${pct}%"></div></div>
+            <div class="conv-num">${s.convictionScore.toFixed(1)}</div>
+          </div>
+          <div style="font-size:10px;color:var(--muted);margin-top:3px">conviction</div>
+        </div>
+      </div>
+      <div class="whale-chips">${whaleChips}</div>
+    </div>`;
+  }).join('');
+
+  renderKelly();
+}
+
+function toggleSignal(i) {
+  const card = document.getElementById('sig-' + i);
+  card.classList.toggle('expanded');
+}
+
+// ── kelly criterion ───────────────────────────────────────────────────────────
+function renderKelly() {
+  if (!DATA || !DATA.signals.length) return;
+  const bankroll = parseFloat(document.getElementById('bankroll').value) || 1000;
+  const half = document.getElementById('half-kelly').checked;
+  const top3 = DATA.signals.slice(0, 3);
+  const html = top3.map(s => {
+    // p = estimated true probability implied by where whales are buying
+    // We use avgPrice of the consensus direction as our edge estimate:
+    // If whales buy YES at 45¢, we think YES is actually worth more → edge exists
+    const p = s.avgPrice > 0 ? s.avgPrice : 0.5;
+    // b = net payout per $ bet at current price (pari-mutuel style)
+    const b = p > 0 ? (1 / p) - 1 : 1;
+    const q = 1 - p;
+    let f = (p * b - q) / b;
+    f = Math.max(0, f);
+    if (half) f = f / 2;
+    f = Math.min(f, 0.25); // cap at 25% of bankroll
+    const betAmt = (bankroll * f).toFixed(2);
+    const ev = (p * b - q) * 100;
+    return `
+    <div class="kelly-item">
+      <div class="mkt">${s.title.length > 70 ? s.title.slice(0,70)+'…' : s.title}</div>
+      <div class="bet">${s.direction} · $${betAmt}</div>
+      <div class="ev">EV/$ ${ev.toFixed(1)}¢ · price ${(s.avgPrice*100).toFixed(0)}¢ · ${(f*100).toFixed(1)}% of bankroll</div>
+    </div>`;
+  }).join('');
+  document.getElementById('kelly-results').innerHTML = html;
+}
+
+// ── leaderboard tab ───────────────────────────────────────────────────────────
+function renderLeaderboard() {
+  if (!DATA) return;
+  const tbody = document.getElementById('lb-body');
+  tbody.innerHTML = DATA.traders.map(t => {
+    const pnl = t.pnl || 0;
+    const tw = t.xUsername ? `<a href="https://x.com/${t.xUsername}" target="_blank">@${t.xUsername}</a>` : '—';
+    return `<tr onclick="showWalletInPanel('${t.proxyWallet}', ${t.rank})">
+      <td><strong>${t.rank}</strong></td>
+      <td><span class="addr" title="${t.proxyWallet}" onclick="event.stopPropagation();copyAddr('${t.proxyWallet}')">${t.userName || shortAddr(t.proxyWallet)}</span></td>
+      <td class="${pnlClass(pnl)}">${fmt$(pnl)}</td>
+      <td>${fmt$(t.volume)}</td>
+      <td>${t.positionCount}</td>
+      <td>${tw}</td>
+    </tr>`;
+  }).join('');
+}
+
+function showWalletInPanel(address, rank) {
+  const trader = DATA.traders.find(t => t.proxyWallet === address);
+  if (!trader || !trader.positions.length) return;
+
+  document.querySelectorAll('#lb-body tr').forEach(r => r.classList.remove('selected'));
+  event.currentTarget.classList.add('selected');
+
+  document.getElementById('wallet-detail-title').textContent =
+    `#${rank} ${trader.userName || shortAddr(address)} — Open Positions`;
+
+  const rows = trader.positions.map(p => {
+    const pnl = p.cashPnl || 0;
+    const pct = p.percentPnl || 0;
+    return `<tr>
+      <td class="wrap">${p.title || '—'}</td>
+      <td><span class="badge ${(p.outcome||'').toLowerCase()}">${p.outcome || '—'}</span></td>
+      <td>${(p.size||0).toFixed(0)}</td>
+      <td>${((p.avgPrice||0)*100).toFixed(0)}¢</td>
+      <td>${((p.price||0)*100).toFixed(0)}¢</td>
+      <td class="${pnlClass(pnl)}">${fmt$(pnl)}</td>
+      <td class="${pnlClass(pct)}">${fmtPct(pct)}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('wallet-pos-body').innerHTML = rows ||
+    '<tr><td colspan="7" style="color:var(--muted);text-align:center;padding:20px">No open positions</td></tr>';
+  document.getElementById('wallet-detail').style.display = 'block';
+  document.getElementById('wallet-detail').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+// ── wallet deep-dive tab ──────────────────────────────────────────────────────
+async function loadWallet() {
+  const addr = document.getElementById('wallet-input').value.trim();
+  if (!addr.startsWith('0x') || addr.length < 20) {
+    alert('Enter a valid Ethereum address (0x…)'); return;
+  }
+  const cont = document.getElementById('wallet-tab-content');
+  cont.innerHTML = '<div style="display:flex;justify-content:center;padding:40px"><div class="spinner"></div></div>';
+  try {
+    const res = await fetch('/api/positions?user=' + encodeURIComponent(addr));
+    const data = await res.json();
+    const positions = Array.isArray(data) ? data : (data.data || []);
+    if (!positions.length) {
+      cont.innerHTML = '<p style="color:var(--muted);text-align:center;padding:40px">No open positions found for this address.</p>';
+      return;
+    }
+    const rows = positions.map(p => {
+      const pnl = p.cashPnl || 0;
+      const pct = p.percentPnl || 0;
+      return `<tr>
+        <td class="wrap">${p.title || '—'}</td>
+        <td><span class="badge ${(p.outcome||'').toLowerCase()}">${p.outcome || '—'}</span></td>
+        <td>${(p.size||0).toFixed(0)}</td>
+        <td>${((p.avgPrice||0)*100).toFixed(0)}¢</td>
+        <td>${((p.price||0)*100).toFixed(0)}¢</td>
+        <td class="${pnlClass(pnl)}">${fmt$(pnl)}</td>
+        <td class="${pnlClass(pct)}">${fmtPct(pct)}</td>
+      </tr>`;
+    }).join('');
+    cont.innerHTML = `
+      <p style="color:var(--muted);font-size:12px;margin-bottom:12px">${positions.length} open positions</p>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Market</th><th>Side</th><th>Size</th><th>Avg Buy</th><th>Current</th><th>P&amp;L</th><th>%</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>`;
+  } catch (err) {
+    cont.innerHTML = `<p style="color:var(--red);padding:20px">Error: ${err.message}</p>`;
+  }
+}
+
+// prefill wallet tab when coming from leaderboard click
+function openWalletTab(address) {
+  document.getElementById('wallet-input').value = address;
+  document.querySelector('[data-tab="wallet"]').click();
+  loadWallet();
+}
+
+// ── boot ──────────────────────────────────────────────────────────────────────
+loadAll();
+</script>
+</body>
+</html>
